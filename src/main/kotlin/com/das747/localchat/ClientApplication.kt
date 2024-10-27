@@ -26,7 +26,7 @@ class ClientApplication(
             }
             receiverLoop.invokeOnCompletion { reason ->
                 if (reason == null) {
-                    output.writeSystemMessage("Connection closed, please press enter to exit")
+                    output.writeSystemMessage("Please press enter to exit")
                     senderLoop.cancel()
                 }
             }
@@ -82,8 +82,9 @@ class ClientApplication(
                 }
             }
         } catch (e: CancellationException) {
-            output.writeSystemMessage("Connection cancelled")
-        }  catch (e: SocketException) {
+            socket.close()
+        } catch (_: SocketException) {
+        } finally {
             output.writeSystemMessage("Connection closed")
         }
     }
