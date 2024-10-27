@@ -15,9 +15,9 @@ class ClientApplication(
     private val output: UserOutputProvider
 ) : Application {
     override suspend fun run() {
+        val port = getPort() ?: return
+        val socket = connect("localhost", port) ?: return
         coroutineScope {
-            val port = getPort() ?: return@coroutineScope
-            val socket = connect("localhost", port) ?: return@coroutineScope
             val receiverLoop = launch(Dispatchers.IO) {
                 handleIncomingMessages(socket)
             }
@@ -28,6 +28,7 @@ class ClientApplication(
                 if (reason == null) {
                     output.writeSystemMessage("Please press enter to exit")
                     senderLoop.cancel()
+                    socket.close()
                 }
             }
             senderLoop.invokeOnCompletion { reason ->
@@ -81,27 +82,22 @@ class ClientApplication(
                     output.writeSystemMessage("Failed to decode message")
                 }
             }
-        } catch (e: CancellationException) {
-            socket.close()
         } catch (_: SocketException) {
         } finally {
-            output.writeSystemMessage("Connection closed")
+            socket.close()
+            output.writeSystemMessage("Connection to ${socket.port} closed")
         }
     }
 
     private suspend fun handleUserInput(socket: Socket) = coroutineScope {
-        try {
-            val socketWriter = PrintWriter(socket.getOutputStream(), true)
-            while (true) {
-                val userInput = input.getInput() ?: break
-                if (userInput.isEmpty()) continue
-                ensureActive()
-                val messageData = MessageData(userInput, MetaData(Clock.System.now(), "aboba"))
-                val jsonData = Json.encodeToString(messageData)
-                socketWriter.println(jsonData)
-            }
-        } catch (e: CancellationException) {
-            output.writeSystemMessage("Input closed")
+        val socketWriter = PrintWriter(socket.getOutputStream(), true)
+        while (true) {
+            val userInput = input.getInput() ?: break
+            ensureActive()
+            if (userInput.isEmpty()) continue
+            val messageData = MessageData(userInput, MetaData(Clock.System.now(), "aboba"))
+            val jsonData = Json.encodeToString(messageData)
+            socketWriter.println(jsonData)
         }
     }
 }
