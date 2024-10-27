@@ -46,8 +46,8 @@ class ClientApplication(
         while (true) {
             try {
                 output.writeSystemMessage("Please select destination port:")
-//                val port = input.getInput()?.toInt() ?: return null
-                val port = 5111
+                val port = input.getInput()?.toInt() ?: return null
+//                val port = 5111
                 if (port !in 1..65535) {
                     throw IllegalArgumentException("Invalid port value: $port")
                 }
