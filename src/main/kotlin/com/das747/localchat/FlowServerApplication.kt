@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -19,6 +21,10 @@ class FlowServerApplication(
     private val input: UserInputProvider,
     private val output: UserOutputProvider
 ) : Application {
+
+    companion object {
+        val logger: Logger = LoggerFactory.getLogger(FlowServerApplication::class.java)
+    }
 
     private val localId = -1
     private val user = "aboba"
@@ -34,15 +40,14 @@ class FlowServerApplication(
 
     override suspend fun run() {
         coroutineScope {
-            val serverSocket = ServerSocket(5111)
+            val serverSocket = ServerSocket(0)
             output.writeSystemMessage("Listening on port ${serverSocket.localPort}")
-            val connectionHandler = launch(Dispatchers.IO) {
-                handleConnections(serverSocket)
-            }
-            val outputHandler = launch(Dispatchers.IO) {
-                handleUserOutput()
-            }
-            outputHandler.invokeOnCompletion { output.writeSystemMessage("User output closed") }
+
+            val connectionHandler = launch(Dispatchers.IO) { handleConnections(serverSocket) }
+
+            val outputHandler = launch(Dispatchers.IO) { handleUserOutput() }
+                .apply { invokeOnCompletion { logger.debug("user output closed") } }
+
             launch {
                 handleUserInput()
                 connectionHandler.cancel()
@@ -59,27 +64,30 @@ class FlowServerApplication(
         try {
             while (true) {
                 val socket = withCancelCheck { serverSocket.accept() }
-                val outputHandler = launch {
-                    handleOutgoingMessages(socket)
-                }
+
+                val outputHandler = launch { handleOutgoingMessages(socket) }
+                    .apply { invokeOnCompletion { logger.debug("output to ${socket.port} closed") } }
+
                 launch {
                     handleIncomingMessages(socket)
                     outputHandler.cancel()
+                    socket.close()
+                    clients.remove(socket)
+                    output.writeSystemMessage("Disconnected ${socket.port}")
                 }
-                outputHandler.invokeOnCompletion {
-                    output.writeSystemMessage("closing output to ${socket.port}")
-                }
+
                 clients.add(socket)
                 output.writeSystemMessage("Connected ${socket.port}")
             }
         } catch (_: SocketException) {
+        } finally {
+            logger.debug("connection handler stopped")
         }
     }
 
-    private suspend fun handleUserOutput(): Nothing = coroutineScope {
-        output.writeSystemMessage("started user output")
-        outputQueue.collect { (message, _) ->
-            output.writeSystemMessage("found $message in queue")
+    private suspend fun handleUserOutput(): Nothing {
+        logger.debug("started user output")
+        outputQueue.collect { (message, clientId) ->
             output.writeMessage(message)
         }
     }
@@ -87,11 +95,13 @@ class FlowServerApplication(
     private suspend fun handleOutgoingMessages(socket: Socket): Nothing = coroutineScope {
         val socketWriter = PrintWriter(socket.getOutputStream(), true)
         outputQueue.collect { (message, clientId) ->
-            if (clientId != socket.port) {
-                val jsonData = Json.encodeToString(message)
-                socketWriter.println(jsonData)
-//                  output.writeSystemMessage("Sent $message to ${socket.port}")
-            } // here we can send ack to the original sender
+            if (clientId == socket.port) {
+                // here we can send ack to the original sender
+                return@collect
+            }
+            val jsonData = Json.encodeToString(message)
+            socketWriter.println(jsonData)
+            logger.debug("Sent {} to {}", message, socket.port)
         }
     }
 
@@ -99,11 +109,11 @@ class FlowServerApplication(
         while (true) {
             val userInput = withCancelCheck { input.getInput() } ?: break
             if (userInput.isEmpty()) continue
-//            output.writeSystemMessage("Read \"$userInput\" from input ")
+            logger.debug("Read \"$userInput\" from input")
             val messageData = MessageData(userInput, MetaData(Clock.System.now(), user))
             messageQueue.emit(messageData to localId)
         }
-        output.writeSystemMessage("User input closed")
+        logger.debug("User input closed")
     }
 
     private suspend fun handleIncomingMessages(socket: Socket) = coroutineScope {
@@ -114,21 +124,19 @@ class FlowServerApplication(
                     val jsonData = withCancelCheck { socketReader.readLine() } ?: break
                     val messageData = Json.decodeFromString<MessageData>(jsonData)
                     messageQueue.emit(messageData to socket.port)
-//                    output.writeSystemMessage("Read $messageData from ${socket.port}")
+                    logger.debug("Read {} from {}", messageData, socket.port)
                 } catch (e: IllegalArgumentException) {
                     output.writeSystemMessage("Failed to decode message from ${socket.port}")
                 }
             }
         } catch (_: SocketException) {
         } finally {
-            output.writeSystemMessage("closing input from ${socket.port}")
-            socket.close()
-            clients.remove(socket)
+            logger.debug("closing input from ${socket.port}")
         }
     }
 }
 
-fun <T> CoroutineScope.withCancelCheck(block: () -> T): T {
+internal fun <T> CoroutineScope.withCancelCheck(block: () -> T): T {
     ensureActive()
     val result = block()
     ensureActive()

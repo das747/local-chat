@@ -10,6 +10,6 @@ class StdoutOutputProvider : UserOutputProvider {
     }
 
     override fun writeSystemMessage(message: String) {
-        println(message)
+        println("[SYSTEM] $message")
     }
 }
