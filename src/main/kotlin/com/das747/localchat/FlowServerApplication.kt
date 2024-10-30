@@ -136,7 +136,7 @@ class FlowServerApplication(
     }
 }
 
-internal fun <T> CoroutineScope.withCancelCheck(block: () -> T): T {
+private fun <T> CoroutineScope.withCancelCheck(block: () -> T): T {
     ensureActive()
     val result = block()
     ensureActive()

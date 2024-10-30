@@ -8,7 +8,7 @@ fun main() {
 //    } else {
 //        ClientApplication(StdinInputProvider(), StdoutOutputProvider())
 //    }
-    val app = FlowServerApplication(StdinInputProvider(), StdoutOutputProvider())
+    val app = ChannelServerApplication(StdinInputProvider(), StdoutOutputProvider())
     runBlocking {
         app.run()
     }
