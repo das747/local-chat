@@ -1,5 +1,7 @@
-package com.das747.localchat
+package com.das747.localchat.client
 
+import com.das747.localchat.Message
+import com.das747.localchat.application.ReceivedMessage
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
@@ -10,7 +12,7 @@ import java.io.PrintWriter
 import java.net.Socket
 import java.net.SocketException
 
-class RemoteClient(private val socket: Socket) : Client {
+internal class RemoteClient(private val socket: Socket) : Client {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(RemoteClient::class.java)
     }

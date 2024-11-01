@@ -1,5 +1,8 @@
-package com.das747.localchat
+package com.das747.localchat.application
 
+import com.das747.localchat.client.RemoteClient
+import com.das747.localchat.io.UserInputProvider
+import com.das747.localchat.io.UserOutputProvider
 import java.net.Socket
 import kotlinx.coroutines.*
 import org.slf4j.Logger
@@ -7,11 +10,11 @@ import org.slf4j.LoggerFactory
 
 class ClientApplication(
     input: UserInputProvider,
-    output: UserOutputProvider
-) : ApplicationBase(input, output) {
+    output: UserOutputProvider,
+    name: String
+) : ApplicationBase(input, output, name) {
 
     override val logger: Logger = LoggerFactory.getLogger(ClientApplication::class.java)
-
 
     override suspend fun run() {
         val port = getPort() ?: return
@@ -50,8 +53,7 @@ class ClientApplication(
         while (true) {
             try {
                 output.writeSystemMessage("Please select destination port:")
-//                val port = input.getInput()?.toInt() ?: return null
-                val port = 5111
+                val port = input.getInput()?.toInt() ?: return null
                 if (port !in 1..65535) {
                     throw IllegalArgumentException("Invalid port value: $port")
                 }

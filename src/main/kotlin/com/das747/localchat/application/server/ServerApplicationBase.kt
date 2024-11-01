@@ -1,5 +1,11 @@
-package com.das747.localchat
+package com.das747.localchat.application.server
 
+import com.das747.localchat.client.Client
+import com.das747.localchat.io.UserInputProvider
+import com.das747.localchat.io.UserOutputProvider
+import com.das747.localchat.application.ApplicationBase
+import com.das747.localchat.application.withCancelCheck
+import com.das747.localchat.client.RemoteClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -8,8 +14,9 @@ import java.net.SocketException
 
 abstract class ServerApplicationBase(
     input: UserInputProvider,
-    output: UserOutputProvider
-) : ApplicationBase(input, output) {
+    output: UserOutputProvider,
+    name: String
+) : ApplicationBase(input, output, name) {
 
     protected fun CoroutineScope.launchConnectionHandler(serverSocket: ServerSocket) =
         launch(Dispatchers.IO) {

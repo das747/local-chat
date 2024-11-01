@@ -1,7 +1,11 @@
 @file:OptIn(ExperimentalCoroutinesApi::class)
 
-package com.das747.localchat
+package com.das747.localchat.application.server
 
+import com.das747.localchat.client.Client
+import com.das747.localchat.io.UserInputProvider
+import com.das747.localchat.io.UserOutputProvider
+import com.das747.localchat.application.ReceivedMessage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -12,11 +16,11 @@ import org.slf4j.LoggerFactory
 import java.net.ServerSocket
 import java.util.concurrent.ConcurrentHashMap
 
-
 class ChannelServerApplication(
     input: UserInputProvider,
-    output: UserOutputProvider
-) : ServerApplicationBase(input, output) {
+    output: UserOutputProvider,
+    name: String
+) : ServerApplicationBase(input, output, name) {
 
     override val logger: Logger = LoggerFactory.getLogger(FlowServerApplication::class.java)
 
@@ -37,7 +41,7 @@ class ChannelServerApplication(
 
     override suspend fun run() {
         coroutineScope {
-            val serverSocket = ServerSocket(5111)
+            val serverSocket = ServerSocket(0)
             output.writeSystemMessage("Listening on port ${serverSocket.localPort}")
             val connectionHandler = launchConnectionHandler(serverSocket)
 

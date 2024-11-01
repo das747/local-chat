@@ -1,13 +1,18 @@
-package com.das747.localchat
+package com.das747.localchat.client
 
+import com.das747.localchat.Message
+import com.das747.localchat.Metadata
+import com.das747.localchat.io.UserInputProvider
+import com.das747.localchat.io.UserOutputProvider
+import com.das747.localchat.application.ReceivedMessage
 import kotlinx.datetime.Clock
 
 open class LocalClient(
     private val input: UserInputProvider,
-    private val output: UserOutputProvider
+    private val output: UserOutputProvider,
+    private val name: String
 ) : Client {
     override val id: ClientId = -1
-    private val name = "aboba"
 
     override fun sendMessage(message: ReceivedMessage) {
         output.writeMessage(message.first)

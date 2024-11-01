@@ -1,5 +1,6 @@
-package com.das747.localchat
+package com.das747.localchat.io
 
+import com.das747.localchat.Message
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 

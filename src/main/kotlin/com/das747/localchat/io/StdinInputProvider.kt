@@ -1,4 +1,4 @@
-package com.das747.localchat
+package com.das747.localchat.io
 
 class StdinInputProvider : UserInputProvider {
 

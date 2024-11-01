@@ -1,5 +1,11 @@
-package com.das747.localchat
+package com.das747.localchat.application
 
+import com.das747.localchat.*
+import com.das747.localchat.client.Client
+import com.das747.localchat.client.ClientId
+import com.das747.localchat.client.LocalClient
+import com.das747.localchat.io.UserInputProvider
+import com.das747.localchat.io.UserOutputProvider
 import kotlinx.coroutines.*
 import org.slf4j.Logger
 
@@ -8,14 +14,15 @@ typealias ReceivedMessage = Pair<Message, ClientId>
 
 abstract class ApplicationBase(
     protected val input: UserInputProvider,
-    protected val output: UserOutputProvider
+    protected val output: UserOutputProvider,
+    name: String
 ) : Application {
 
     protected abstract val logger: Logger
 
     protected val user = "aboba"
 
-    protected val localClient = LocalClient(input, output)
+    protected val localClient = LocalClient(input, output, name)
 
     protected fun CoroutineScope.launchOutputHandler(
         client: Client,
