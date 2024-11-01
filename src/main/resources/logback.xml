@@ -1,6 +1,7 @@
 <configuration>
+  <property name="localChat.logfile" value="${localChat.logfile:-logs/default.log}"/>
   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-    <file>logs/application.log</file>
+    <file>${localChat.logfile}</file>
     <param name="Append" value="false" />
     <encoder>
       <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>

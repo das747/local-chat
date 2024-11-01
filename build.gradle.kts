@@ -28,8 +28,17 @@ kotlin {
     jvmToolchain(17)
 }
 
+val systemProps by extra {
+    listOf(
+        "localChat.logfile",
+        "localChat.server"
+    )
+}
+
 application {
     mainClass.set("com.das747.localchat.MainKt")
+    applicationDefaultJvmArgs = properties.filterKeys { it in systemProps }.map { "-D${it.key}=${it.value}" }
+    applicationDefaultJvmArgs.forEach { println(it) }
 }
 
 tasks.run.configure {
