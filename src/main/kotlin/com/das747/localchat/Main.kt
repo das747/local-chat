@@ -10,6 +10,9 @@ import com.das747.localchat.io.UserInputProvider
 import com.das747.localchat.io.UserOutputProvider
 import kotlinx.coroutines.runBlocking
 
+fun UserInputProvider.getNonEmptyString(): String? {
+    return getInput()?.ifBlank { getNonEmptyString() }
+}
 
 fun createApplication(
     input: UserInputProvider,
@@ -18,7 +21,7 @@ fun createApplication(
 ): Application? {
     while (true) {
         output.writeSystemMessage("Do you want to start a new chat or join existing? [join/start]")
-        val type = input.getInput() ?: return null
+        val type = input.getNonEmptyString() ?: return null
         when (type) {
             "join" -> return ClientApplication(input, output, name)
             "start" -> return when (System.getProperty("localChat.server", "flow")) {
@@ -33,7 +36,7 @@ fun main() {
     val input = StdinInputProvider()
     val output = StdoutOutputProvider()
     output.writeSystemMessage("Please enter your nickname:")
-    val name = input.getInput()?.ifBlank { input.getInput() } ?: return
+    val name = input.getNonEmptyString() ?: return
     val app = createApplication(input, output, name) ?: return
     runBlocking {
         app.run()
