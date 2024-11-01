@@ -13,7 +13,6 @@ import java.net.Socket
 import java.net.SocketException
 import java.util.concurrent.ConcurrentHashMap
 
-typealias ClientId = Int
 
 class ServerApplication(
     private val input: UserInputProvider,
@@ -22,11 +21,11 @@ class ServerApplication(
     private data class ClientData(
         val scope: CoroutineScope,
         val socket: Socket,
-        val queue: Channel<MessageData>
+        val queue: Channel<Message>
     )
 
     private val user = "aboba"
-    private val centralQueue = Channel<Pair<MessageData, ClientId>>(100)
+    private val centralQueue = Channel<Pair<Message, ClientId>>(100)
     private val clientData: MutableMap<ClientId, ClientData> = ConcurrentHashMap()
 
     private val localId = -1
@@ -39,7 +38,7 @@ class ServerApplication(
                 handleMessageQueue()
             }
             launch(Dispatchers.IO) {
-                val outputQueue = Channel<MessageData>(10)
+                val outputQueue = Channel<Message>(10)
                 clientData[localId] = ClientData(this, Socket(), outputQueue)
                 for (message in outputQueue) {
                     output.writeMessage(message)
@@ -77,7 +76,7 @@ class ServerApplication(
             while (true) {
                 val socket = serverSocket.accept()
                 output.writeSystemMessage("Connected ${socket.port}")
-                val queue = Channel<MessageData>(10)
+                val queue = Channel<Message>(10)
                 val scope = CoroutineScope(Dispatchers.IO + Job())
                 scope.launch {
                     handleIncomingMessages(socket)
@@ -101,7 +100,9 @@ class ServerApplication(
             ensureActive()
             if (userInput.isEmpty()) continue
 //            output.writeSystemMessage("Read \"$userInput\" from input ")
-            val messageData = MessageData(userInput, MetaData(Clock.System.now(), user))
+            val messageData = Message(userInput,
+                Metadata(Clock.System.now(), user)
+            )
             centralQueue.send(messageData to localId)
         }
     }
@@ -113,7 +114,7 @@ class ServerApplication(
         }
     }
 
-    private suspend fun handleOutgoingMessages(socket: Socket, queue: Channel<MessageData>) {
+    private suspend fun handleOutgoingMessages(socket: Socket, queue: Channel<Message>) {
         val socketWriter = PrintWriter(socket.getOutputStream(), true)
         for (message in queue) {
 //            output.writeSystemMessage("Sent $message to ${socket.port}")
@@ -129,7 +130,7 @@ class ServerApplication(
                 try {
                     val jsonData = socketReader.readLine() ?: break
                     ensureActive()
-                    val messageData = Json.decodeFromString<MessageData>(jsonData)
+                    val messageData = Json.decodeFromString<Message>(jsonData)
 //                    output.writeSystemMessage("Read $messageData from ${socket.port}")
                     centralQueue.send(messageData to socket.port)
                 } catch (e: IllegalArgumentException) {

@@ -2,42 +2,46 @@ package com.das747.localchat
 
 import java.net.Socket
 import kotlinx.coroutines.*
-import kotlinx.datetime.Clock
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import java.net.SocketException
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class ClientApplication(
-    private val input: UserInputProvider,
-    private val output: UserOutputProvider
-) : Application {
+    input: UserInputProvider,
+    output: UserOutputProvider
+) : ApplicationBase(input, output) {
+
+    override val logger: Logger = LoggerFactory.getLogger(ClientApplication::class.java)
+
+
     override suspend fun run() {
         val port = getPort() ?: return
         val socket = connect("localhost", port) ?: return
+        val remoteClient = RemoteClient(socket)
         coroutineScope {
-            val receiverLoop = launch(Dispatchers.IO) {
-                handleIncomingMessages(socket)
-            }
-            val senderLoop = launch(Dispatchers.IO) {
-                handleUserInput(socket)
-            }
-            receiverLoop.invokeOnCompletion { reason ->
-                if (reason == null) {
-                    output.writeSystemMessage("Please press enter to exit")
-                    senderLoop.cancel()
-                    socket.close()
+            val outputHandler = launch(Dispatchers.IO) {
+                processIncomingMessages(remoteClient) { message ->
+                    localClient.sendMessage(message)
                 }
             }
-            senderLoop.invokeOnCompletion { reason ->
-                if (reason == null) {
-                    output.writeSystemMessage("Input closed, closing connection...")
-                    receiverLoop.cancel()
-                    socket.close()
+            val inputHandler = launch(Dispatchers.IO) {
+                processIncomingMessages(localClient) { message ->
+                    localClient.sendMessage(message)
+                    remoteClient.sendMessage(message)
                 }
             }
+            outputHandler.onSuccess {
+                inputHandler.cancel()
+                remoteClient.close()
+                output.writeSystemMessage("Connection to ${remoteClient.id}) closed.")
+                output.writeSystemMessage("Please press enter to exit")
+
+            }
+            inputHandler.onSuccess {
+                outputHandler.cancel()
+                remoteClient.close()
+                output.writeSystemMessage("Input closed. Disconnecting ${remoteClient.id}...")
+            }
+
         }
         output.writeSystemMessage("Exiting application...")
     }
@@ -46,8 +50,8 @@ class ClientApplication(
         while (true) {
             try {
                 output.writeSystemMessage("Please select destination port:")
-                val port = input.getInput()?.toInt() ?: return null
-//                val port = 5111
+//                val port = input.getInput()?.toInt() ?: return null
+                val port = 5111
                 if (port !in 1..65535) {
                     throw IllegalArgumentException("Invalid port value: $port")
                 }
@@ -69,35 +73,11 @@ class ClientApplication(
         }
     }
 
-    private suspend fun handleIncomingMessages(socket: Socket) = coroutineScope {
-        try {
-            val socketReader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            while (true) {
-                try {
-                    val jsonData = socketReader.readLine() ?: break
-                    ensureActive()
-                    val messageData = Json.decodeFromString<MessageData>(jsonData)
-                    output.writeMessage(messageData)
-                } catch (e: IllegalArgumentException) {
-                    output.writeSystemMessage("Failed to decode message")
-                }
+    private fun Job.onSuccess(action: () -> Unit) {
+        invokeOnCompletion {
+            if (it == null) {
+                action()
             }
-        } catch (_: SocketException) {
-        } finally {
-            socket.close()
-            output.writeSystemMessage("Connection to ${socket.port} closed")
-        }
-    }
-
-    private suspend fun handleUserInput(socket: Socket) = coroutineScope {
-        val socketWriter = PrintWriter(socket.getOutputStream(), true)
-        while (true) {
-            val userInput = input.getInput() ?: break
-            ensureActive()
-            if (userInput.isEmpty()) continue
-            val messageData = MessageData(userInput, MetaData(Clock.System.now(), "aboba"))
-            val jsonData = Json.encodeToString(messageData)
-            socketWriter.println(jsonData)
         }
     }
 }
